@@ -36,7 +36,7 @@ button{font:inherit;cursor:pointer;border:none;background:none;color:inherit}
 input,select,textarea{font:inherit;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:8px;padding:9px 11px;width:100%}
 input:focus,select:focus,textarea:focus{outline:2px solid var(--blue);outline-offset:0}
 .app{max-width:640px;margin:0 auto;min-height:100%;display:flex;flex-direction:column}
-header.top{position:sticky;top:0;z-index:20;background:var(--navy);color:#fff;padding:12px 16px 10px}
+header.top{position:sticky;top:0;z-index:20;background:var(--navy);color:#fff;padding:calc(12px + env(safe-area-inset-top)) 16px 10px}
 :root[data-theme="dark"] header.top,html body header.top{background:#0b3f60}
 header.top h1{font-size:16px;font-weight:800;letter-spacing:.02em}
 header.top .sub{font-size:11px;color:#bcd6e8;margin-top:1px}
@@ -99,12 +99,11 @@ textarea.terms{min-height:170px;font-size:12.5px;line-height:1.55}
 /* ---- preview overlay ---- */
 .ovl{position:fixed;inset:0;z-index:40;background:#3a4250;display:none;flex-direction:column}
 .ovl.open{display:flex}
-.ovl .bar{background:var(--navy);color:#fff;display:flex;align-items:center;gap:8px;padding:10px 12px;flex:0 0 auto}
+.ovl .bar{background:var(--navy);color:#fff;display:flex;align-items:center;gap:10px;padding:10px 12px calc(10px + env(safe-area-inset-bottom));flex:0 0 auto}
 html body .ovl .bar{background:#0b3f60}
-.ovl .bar b{flex:1;font-size:14px}
-.ovl .bar button{background:rgba(255,255,255,.14);border-radius:8px;padding:8px 14px;font-size:13px;font-weight:700;color:#fff}
-.ovl .bar button.primary{background:#b9852c}
-.ovl .scroll{flex:1;overflow:auto;-webkit-overflow-scrolling:touch;padding:14px 0 40px}
+.ovl .bar button{flex:1;background:rgba(255,255,255,.14);border-radius:10px;padding:13px 14px;font-size:15px;font-weight:700;color:#fff}
+.ovl .bar button.primary{flex:1.4;background:#b9852c}
+.ovl .scroll{flex:1;overflow:auto;-webkit-overflow-scrolling:touch;padding:calc(14px + env(safe-area-inset-top)) 0 24px}
 .docholder{width:100%;display:flex;justify-content:center}
 .hintbar{color:#cdd4df;font-size:11.5px;text-align:center;padding:6px 14px}
 
@@ -229,13 +228,12 @@ html body .ovl .bar{background:#0b3f60}
 
 <!-- önizleme -->
 <div class="ovl" id="ovl">
+  <div class="scroll"><div class="docholder"><div id="doc"></div></div></div>
+  <div class="hintbar">Fiyata dokunup değiştirebilirsiniz · Yazdırma penceresinden “PDF olarak kaydet”i seçip paylaşın.</div>
   <div class="bar">
     <button id="btnClose">‹ Geri</button>
-    <b>Önizleme — fiyata dokunup değiştirebilirsiniz</b>
     <button class="primary" id="btnPrint">PDF / Yazdır</button>
   </div>
-  <div class="hintbar">Yazdırma penceresinden “PDF olarak kaydet”i seçip WhatsApp / e-posta ile paylaşabilirsiniz.</div>
-  <div class="scroll"><div class="docholder"><div id="doc"></div></div></div>
 </div>
 
 <script>
