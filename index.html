@@ -72,6 +72,10 @@ nav.bottom .ic{font-size:19px;line-height:1}
 /* ---- quote form ---- */
 .fgroup{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px}
 .fgroup h2{font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:10px}
+.ghead{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.ghead h2{margin-bottom:0}
+.clearbtn{color:var(--red);font-size:12.5px;font-weight:700;padding:5px 10px;border:1px solid var(--line);border-radius:8px}
+.clearbtn.confirm{background:var(--red);color:#fff;border-color:var(--red)}
 .frow{margin-bottom:10px}
 .frow:last-child{margin-bottom:0}
 .frow label{display:block;font-size:12px;font-weight:600;color:var(--ink2);margin-bottom:4px}
@@ -198,7 +202,10 @@ html body .ovl .bar{background:#0b3f60}
     </div>
 
     <div class="fgroup">
-      <h2>Seçilen Ürünler <span id="lcount"></span></h2>
+      <div class="ghead">
+        <h2>Seçilen Ürünler <span id="lcount"></span></h2>
+        <button class="clearbtn hidden" id="btnClear" type="button">Tümünü kaldır</button>
+      </div>
       <div id="lines"></div>
       <div class="empty hidden" id="noline">Henüz ürün seçilmedi.<br>Ürünler sekmesinden ekleyin.</div>
       <div class="hint" id="curhint"></div>
@@ -351,6 +358,8 @@ function renderQuote(){
     :'EUR modunda fiyatları elle girin (KDV hariç €).';
   const wrap=$('lines');wrap.innerHTML='';
   $('noline').classList.toggle('hidden',state.lines.length>0);
+  $('btnClear').classList.toggle('hidden',state.lines.length===0);
+  resetClear();
   state.lines.forEach((l,idx)=>{
     const el=document.createElement('div');el.className='line';
     el.innerHTML=`${l.i?`<img src="${l.i}" alt="">`:''}
@@ -382,6 +391,22 @@ function setCur(c){
 }
 $('curTL').onclick=()=>setCur('TL');
 $('curEU').onclick=()=>setCur('EU');
+
+/* tümünü kaldır — iki dokunuşlu onay */
+let clearTimer=null;
+function resetClear(){
+  clearTimeout(clearTimer);clearTimer=null;
+  const b=$('btnClear');b.classList.remove('confirm');b.textContent='Tümünü kaldır';
+}
+$('btnClear').onclick=()=>{
+  const b=$('btnClear');
+  if(!b.classList.contains('confirm')){
+    b.classList.add('confirm');b.textContent='Emin misiniz? Evet, kaldır';
+    clearTimer=setTimeout(resetClear,3500);
+    return;
+  }
+  state.lines=[];save();renderQuote();syncBadge();renderList();
+};
 
 /* ---------- preview / print ---------- */
 function esc(s){return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
