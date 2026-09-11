@@ -165,7 +165,7 @@ html body .ovl .bar{background:#0b3f60}
 <div class="app">
 <header class="top">
   <h1>Teklif Masası</h1>
-  <div class="sub">Dijital Ankastre · stoktaki ürünlerden hızlı fiyat teklifi</div>
+  <div class="sub">Dijital Ankastre · stoktaki ürünlerden hızlı fiyat teklifi · <span id="ver"></span></div>
 </header>
 <main>
   <!-- ürün seçici -->
@@ -460,6 +460,14 @@ $('btnPrint').onclick=()=>{window.print();};
 window.addEventListener('resize',()=>{if($('ovl').classList.contains('open'))fit();});
 
 /* ---------- init ---------- */
+const APP_VER='v6';
+document.getElementById('ver').textContent=APP_VER;
+if('serviceWorker' in navigator){
+  let reloaded=false;
+  navigator.serviceWorker.addEventListener('controllerchange',()=>{
+    if(reloaded)return; reloaded=true; location.reload();
+  });
+}
 renderChips();renderList();syncBadge();
 
 (function(){

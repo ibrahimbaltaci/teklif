@@ -1,4 +1,4 @@
-const CACHE = 'teklif-v5';
+const CACHE = 'teklif-v6';
 const ASSETS = ['./', './index.html', './manifest.webmanifest',
   './icon-192.png', './icon-512.png', './icon-maskable.png', './apple-touch-icon.png'];
 
