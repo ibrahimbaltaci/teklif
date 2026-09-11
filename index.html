@@ -621,6 +621,14 @@ $('btnPdf').onclick=async()=>{
     const fname='Teklif_'+nameSafe+'_'+(state.date||'')+'.pdf';
     const blob=new Blob([bytes],{type:'application/pdf'});
     const file=new File([blob],fname,{type:'application/pdf'});
+    if(window.claude&&window.claude.use){
+      const dl=await window.claude.use('downloads').catch(()=>null);
+      if(dl){
+        try{await dl.save({filename:fname,data:blob});}
+        catch(err){if(!err||(err.code!=='declined'&&err.name!=='AbortError'))throw err;}
+        b.textContent=old;b.disabled=false;return;
+      }
+    }
     if(navigator.canShare&&navigator.canShare({files:[file]})){
       await navigator.share({files:[file],title:'Fiyat Teklifi'});
     }else{
@@ -637,7 +645,7 @@ $('btnPdf').onclick=async()=>{
 window.addEventListener('resize',()=>{if($('ovl').classList.contains('open'))fit();});
 
 /* ---------- init ---------- */
-const APP_VER='v7';
+const APP_VER='v8';
 document.getElementById('ver').textContent=APP_VER;
 if('serviceWorker' in navigator){
   let reloaded=false;
