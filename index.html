@@ -236,10 +236,11 @@ html body .ovl .bar{background:#0b3f60}
 <!-- önizleme -->
 <div class="ovl" id="ovl">
   <div class="scroll"><div class="docholder"><div id="doc"></div></div></div>
-  <div class="hintbar">Fiyata dokunup değiştirebilirsiniz · Yazdırma penceresinden “PDF olarak kaydet”i seçip paylaşın.</div>
+  <div class="hintbar">Fiyata dokunup değiştirebilirsiniz · “PDF Kaydet” temiz bir PDF üretip paylaşım menüsünü açar.</div>
   <div class="bar">
     <button id="btnClose">‹ Geri</button>
-    <button class="primary" id="btnPrint">PDF / Yazdır</button>
+    <button id="btnPrint">Yazdır</button>
+    <button class="primary" id="btnPdf">PDF Kaydet</button>
   </div>
 </div>
 
@@ -457,10 +458,186 @@ function fit(){
 $('btnPrev').onclick=()=>{buildDoc();$('ovl').classList.add('open');requestAnimationFrame(fit);};
 $('btnClose').onclick=()=>{$('ovl').classList.remove('open');renderQuote();};
 $('btnPrint').onclick=()=>{window.print();};
+
+/* ---------- yerleşik PDF üretici (tarayıcı yazdırma penceresi kullanılmaz) ---------- */
+const PW=794, PH=1123, MG=48;   // A4 @96dpi ve kenar boşluğu (CSS px)
+const PDF_SCALE=2.2;            // çıktı çözünürlüğü (~210 dpi)
+const NAVY_C='#0b3f60', INK_C='#000000', GRAY_C='#555555';
+
+function loadImg(src){return new Promise(res=>{const im=new Image();im.onload=()=>res(im);im.onerror=()=>res(null);im.src=src;});}
+function wrapCanvas(ctx,text,maxw){
+  const words=String(text).split(/\s+/),lines=[];let cur='';
+  for(const w of words){const t=(cur+' '+w).trim();
+    if(ctx.measureText(t).width<=maxw)cur=t;else{if(cur)lines.push(cur);cur=w;}}
+  if(cur)lines.push(cur);return lines;
+}
+function newPage(pages){
+  const c=document.createElement('canvas');
+  c.width=Math.round(PW*PDF_SCALE);c.height=Math.round(PH*PDF_SCALE);
+  const x=c.getContext('2d');x.scale(PDF_SCALE,PDF_SCALE);
+  x.fillStyle='#ffffff';x.fillRect(0,0,PW,PH);
+  x.fillStyle=INK_C;x.strokeStyle=INK_C;
+  x.textBaseline='alphabetic';pages.push(c);return x;
+}
+function fnt(x,size,bold){x.font=(bold?'bold ':'')+size+'px "Helvetica Neue", Arial, sans-serif';}
+
+async function renderPdfPages(){
+  const cur=state.cur==='TL'?'₺':'€';
+  const imgs={};
+  await Promise.all(state.lines.map(async l=>{if(l.i&&!imgs[l.i])imgs[l.i]=await loadImg(l.i);}));
+  const pages=[];let x=newPage(pages);let y=MG;
+  const W1=120, W3=95, W2=PW-2*MG-W1-W3, X0=MG, X1=MG+W1, X2=MG+W1+W2, X3=PW-MG;
+
+  // üst bilgi
+  fnt(x,13,true);x.fillStyle=INK_C;
+  const dstr=state.date?state.date.split('-').reverse().join('.'):'';
+  x.fillText(dstr,X3-x.measureText(dstr).width,y+10);y+=34;
+  fnt(x,21,true);x.fillStyle=NAVY_C;x.fillText('DİJİTAL ANKASTRE',X0,y+6);
+  const bw=x.measureText('DİJİTAL ANKASTRE').width;
+  fnt(x,10,false);x.fillStyle=GRAY_C;x.fillText('F İ Y A T   T E K L İ F İ',X0+bw+12,y+5);
+  x.fillStyle=NAVY_C;x.fillRect(X0,y+14,PW-2*MG,3);y+=42;
+  fnt(x,13,true);x.fillStyle=INK_C;
+  x.fillText('Sn. '+(state.cust||'________________')+',',X0,y);y+=24;
+  fnt(x,12.5,true);
+  for(const ln of wrapCanvas(x,state.intro,PW-2*MG)){x.fillText(ln,X0,y);y+=18;}
+  y+=12;
+
+  function tableHeader(){
+    x.strokeStyle=INK_C;x.lineWidth=1;
+    x.strokeRect(X0,y,PW-2*MG,26);
+    x.beginPath();x.moveTo(X1,y);x.lineTo(X1,y+26);x.moveTo(X2,y);x.lineTo(X2,y+26);x.stroke();
+    fnt(x,12.5,true);x.fillStyle=INK_C;
+    const th=(t,cx)=>x.fillText(t,cx-x.measureText(t).width/2,y+17);
+    th('Ürün',(X0+X1)/2);th('Açıklamalar',(X1+X2)/2);th(cur+' + KDV',(X2+X3)/2);
+    y+=26;
+  }
+  tableHeader();
+
+  for(const l of state.lines){
+    // metin bloğunu ölç
+    fnt(x,11.5,true);const nameLines=wrapCanvas(x,l.n,W2-20);
+    fnt(x,10.5,false);
+    const bullets=[];
+    for(const b of (l.d||[]).slice(0,10)){
+      const ws=wrapCanvas(x,b,W2-34);
+      ws.forEach((w,i)=>bullets.push((i?'  ':'•  ')+w));
+    }
+    const textH=10+nameLines.length*16+bullets.length*14.5+20+10;
+    const im=l.i?imgs[l.i]:null;
+    let iw=0,ih=0;
+    if(im){const r=Math.min(96/im.width,104/im.height,1);iw=im.width*r;ih=im.height*r;}
+    const cell1H=14+18+ih+12;
+    const rowH=Math.max(textH,cell1H,64);
+    if(y+rowH>PH-MG-30){ x=newPage(pages);y=MG;tableHeader(); }
+    // hücre çerçeveleri
+    x.strokeStyle=INK_C;x.lineWidth=1;
+    x.strokeRect(X0,y,PW-2*MG,rowH);
+    x.beginPath();x.moveTo(X1,y);x.lineTo(X1,y+rowH);x.moveTo(X2,y);x.lineTo(X2,y+rowH);x.stroke();
+    // hücre 1: kod + görsel
+    fnt(x,11.5,true);x.fillStyle=INK_C;
+    x.fillText(l.c,(X0+X1)/2-x.measureText(l.c).width/2,y+18);
+    if(im)x.drawImage(im,(X0+X1)/2-iw/2,y+26,iw,ih);
+    // hücre 2: ad + maddeler + kod
+    let ty=y+20;fnt(x,11.5,true);
+    for(const ln of nameLines){x.fillText(ln,X1+10,ty);ty+=16;}
+    ty+=2;fnt(x,10.5,false);
+    for(const ln of bullets){x.fillText(ln,X1+12,ty);ty+=14.5;}
+    ty+=4;fnt(x,10.5,true);x.fillText('Ürün Kodu: '+l.c,X1+10,ty);
+    // hücre 3: fiyat (dikey ortalı)
+    fnt(x,12.5,true);
+    const pr=(l.price!=null?fmt(l.price):',00')+' '+cur;
+    x.fillText(pr,(X2+X3)/2-x.measureText(pr).width/2,y+rowH/2+4);
+    y+=rowH;
+  }
+  // toplam
+  if(state.lines.some(l=>l.price!=null)){
+    const tot=state.lines.reduce((s,l)=>s+(l.price||0),0);
+    x.strokeRect(X0,y,PW-2*MG,26);
+    x.beginPath();x.moveTo(X2,y);x.lineTo(X2,y+26);x.stroke();
+    fnt(x,12.5,true);
+    const lbl='TOPLAM (KDV Hariç)';
+    x.fillText(lbl,X2-10-x.measureText(lbl).width,y+17);
+    const tv=fmt(tot)+' '+cur;
+    x.fillText(tv,(X2+X3)/2-x.measureText(tv).width/2,y+17);
+    y+=26;
+  }
+  y+=24;
+  // şartlar
+  fnt(x,10.5,false);x.fillStyle=INK_C;
+  for(const t of state.terms.split('\n').map(s=>s.trim()).filter(Boolean)){
+    const ws=wrapCanvas(x,t,PW-2*MG-18);
+    if(y+ws.length*15>PH-MG-40){x=newPage(pages);y=MG;fnt(x,10.5,false);}
+    ws.forEach((w,i)=>{x.fillText((i?'   ':'•  ')+w,X0+4,y);y+=15;});
+    y+=4;
+  }
+  y+=16;
+  if(y>PH-MG-40){x=newPage(pages);y=MG;}
+  fnt(x,12,true);x.fillText('Saygılarımızla,',X0,y);y+=18;
+  if(state.sign){fnt(x,12,false);x.fillText(state.sign,X0,y);}
+  return pages;
+}
+
+function canvasJpeg(c){return new Promise(res=>c.toBlob(b=>b.arrayBuffer().then(a=>res(new Uint8Array(a))),'image/jpeg',0.88));}
+async function pagesToPdf(pages){
+  const A4W=595.28,A4H=841.89;
+  const jpegs=await Promise.all(pages.map(canvasJpeg));
+  const enc=s=>{const u=new Uint8Array(s.length);for(let i=0;i<s.length;i++)u[i]=s.charCodeAt(i)&0xff;return u;};
+  const parts=[];const offs=[];let pos=0;
+  const push=u=>{parts.push(u);pos+=u.length;};
+  const obj=(s)=>{offs.push(pos);push(enc(s));};
+  push(enc('%PDF-1.4\n'));
+  const n=pages.length;
+  // 1: catalog, 2: pages, sonra her sayfa için: page(3i), content(3i+1), image(3i+2)
+  const kids=Array.from({length:n},(_,i)=>(3+i*3)+' 0 R').join(' ');
+  obj('1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n');
+  obj('2 0 obj<</Type/Pages/Kids['+kids+']/Count '+n+'>>endobj\n');
+  for(let i=0;i<n;i++){
+    const po=3+i*3,co=po+1,io=po+2;
+    obj(po+' 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 '+A4W+' '+A4H+']/Resources<</XObject<</Im'+i+' '+io+' 0 R>>/ProcSet[/PDF/ImageC]>>/Contents '+co+' 0 R>>endobj\n');
+    const cs='q '+A4W+' 0 0 '+A4H+' 0 0 cm /Im'+i+' Do Q';
+    obj(co+' 0 obj<</Length '+cs.length+'>>stream\n'+cs+'\nendstream endobj\n');
+    offs.push(pos);
+    push(enc(io+' 0 obj<</Type/XObject/Subtype/Image/Width '+pages[i].width+'/Height '+pages[i].height+'/ColorSpace/DeviceRGB/BitsPerComponent 8/Filter/DCTDecode/Length '+jpegs[i].length+'>>stream\n'));
+    push(jpegs[i]);push(enc('\nendstream endobj\n'));
+  }
+  const xref=pos;
+  let xr='xref\n0 '+(offs.length+1)+'\n0000000000 65535 f \n';
+  for(const o of offs)xr+=String(o).padStart(10,'0')+' 00000 n \n';
+  xr+='trailer<</Size '+(offs.length+1)+'/Root 1 0 R>>\nstartxref\n'+xref+'\n%%EOF';
+  push(enc(xr));
+  const total=parts.reduce((s,p)=>s+p.length,0);
+  const out=new Uint8Array(total);let o=0;
+  for(const p of parts){out.set(p,o);o+=p.length;}
+  return out;
+}
+
+$('btnPdf').onclick=async()=>{
+  const b=$('btnPdf');const old=b.textContent;
+  b.textContent='Hazırlanıyor…';b.disabled=true;
+  try{
+    const pages=await renderPdfPages();
+    const bytes=await pagesToPdf(pages);
+    const nameSafe=(state.cust||'Teklif').replace(/[^\wğüşöçıİĞÜŞÖÇ ]/g,'').trim().replace(/\s+/g,'_')||'Teklif';
+    const fname='Teklif_'+nameSafe+'_'+(state.date||'')+'.pdf';
+    const blob=new Blob([bytes],{type:'application/pdf'});
+    const file=new File([blob],fname,{type:'application/pdf'});
+    if(navigator.canShare&&navigator.canShare({files:[file]})){
+      await navigator.share({files:[file],title:'Fiyat Teklifi'});
+    }else{
+      const a=document.createElement('a');
+      a.href=URL.createObjectURL(blob);a.download=fname;
+      document.body.appendChild(a);a.click();a.remove();
+      setTimeout(()=>URL.revokeObjectURL(a.href),30000);
+    }
+  }catch(e){
+    if(e&&e.name!=='AbortError')alert('PDF oluşturulamadı: '+(e.message||e));
+  }
+  b.textContent=old;b.disabled=false;
+};
 window.addEventListener('resize',()=>{if($('ovl').classList.contains('open'))fit();});
 
 /* ---------- init ---------- */
-const APP_VER='v6';
+const APP_VER='v7';
 document.getElementById('ver').textContent=APP_VER;
 if('serviceWorker' in navigator){
   let reloaded=false;
