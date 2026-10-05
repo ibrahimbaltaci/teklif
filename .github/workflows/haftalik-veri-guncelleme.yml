@@ -1,0 +1,55 @@
+name: Haftalık veri güncelleme
+
+# Her pazartesi 06:00'da (TSİ) siteden stoktaki ürünleri çeker; değişiklik varsa
+# uygulama verisini yeniler. Actions sekmesinden "Run workflow" ile elle de çalıştırılabilir.
+on:
+  schedule:
+    - cron: '0 3 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+
+concurrency:
+  group: veri-guncelleme
+  cancel-in-progress: false
+
+jobs:
+  guncelle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Bağımlılıklar
+        run: pip install --quiet pillow
+
+      - name: Siteden veriyi çek ve uygulamayı güncelle
+        run: python tools/guncelle.py
+
+      - name: Değişiklikleri gönder
+        id: gonder
+        run: |
+          git config user.name "teklif-veri-botu"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "Gönderilecek değişiklik yok."
+            exit 0
+          fi
+          git commit -q -m "Haftalık veri güncelleme: $(TZ=Europe/Istanbul date +%d.%m.%Y)"
+          git push -q
+          echo "gonderildi=1" >> "$GITHUB_OUTPUT"
+
+      # Bot'un gönderdiği commit Pages derlemesini kendiliğinden başlatmayabilir; açıkça iste.
+      - name: Yayını yenile
+        if: steps.gonder.outputs.gonderildi == '1'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api -X POST "repos/${{ github.repository }}/pages/builds"
